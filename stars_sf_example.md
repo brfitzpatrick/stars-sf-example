@@ -229,3 +229,98 @@ p5
 Learn more about `stars` and `sf` [here.](https://www.r-spatial.org/)
 
 Learn more about the `tidyverse` (`dplyr`, `magrittr`, `ggplot2` etc.) [here.](https://www.tidyverse.org/)
+
+### Appendix I: Example on Public Data
+
+Download digitial elevation rasters and border polygons from public servers with:
+
+```{r}
+raster::getData()
+```
+
+Print the country codes to the terminal with:
+```{r}
+getData('ISO3')
+```
+
+### `raster` steps
+
+```{r}
+chn.dem.rast <- raster::getData(name = 'alt', country = 'CHN')
+
+chn.dem.rast <- raster::aggregate(x = chn.dem.rast, fact = 4)
+
+chn.bound.sp.poly.l1.df <- raster::getData(name = 'GADM', country = 'CHN', level = 1)
+
+chn.bound.sp.poly.l2.df <- raster::getData(name = 'GADM', country = 'CHN', level = 2)
+
+raster::plot(chn.dem.rast)
+
+sp::plot(chn.bound.sp.poly.l2.df, add = TRUE, border = 'darkgrey')
+
+sp::plot(chn.bound.sp.poly.l1.df, add = TRUE, border = 'black', lwd = 2)
+```
+
+![](Figures/Middle_Kingdom_rast_1.png)
+
+```{r}
+chn.slope.rast <- raster::terrain(x = chn.dem.rast, opt = 'slope')
+
+chn.aspect.rast <- raster::terrain(x = chn.dem.rast, opt = 'aspect')
+
+chn.hs.rast <- raster::hillShade(slope = chn.slope.rast, aspect = chn.aspect.rast, normalize = TRUE)
+
+raster::plot(chn.hs.rast, col=grey(0:100/100), legend=FALSE)
+
+raster::plot(chn.dem.rast, col = rainbow(n = 100, start = 0, end = 0.8, alpha = 0.35), add=TRUE)
+
+sp::plot(chn.bound.sp.poly.l2.df, add = TRUE, border = 'black', lwd = 0.5)
+
+sp::plot(chn.bound.sp.poly.l1.df, add = TRUE, border = 'black', lwd = 2)
+```
+
+![](Figures/Middle_Kingdom_rast_2.png)
+
+### `stars` & `sf` steps
+
+**note:** you'll need stars v0.3-0 from GitHub
+
+install it with:
+
+```{r}
+devtools::install_github('r-spatial/stars')
+```
+
+```{r}
+CHN.HS.stars <- st_as_stars(.x = chn.hs.rast)
+
+CHN.DEM.stars <- st_as_stars(.x = chn.dem.rast)
+
+CHN.Bound.L1.sf <- st_as_sf(x = chn.bound.sp.poly.l1.df)
+
+CHN.Bound.L2.sf <- st_as_sf(x = chn.bound.sp.poly.l2.df)
+
+chn.dem.hs.stars.plot <- ggplot() +
+  geom_stars(data = CHN.HS.stars, aes(x = x, y = y, alpha = -layer), fill = 'black') +
+  scale_alpha_continuous(na.value = 0) +    
+  coord_equal() +
+  geom_sf(data = CHN.Bound.L2.sf, fill = NA, colour = 'grey', alpha = 0.5, size = 0.25) +
+  geom_sf(data = CHN.Bound.L1.sf, fill = NA, colour = 'grey', alpha = 0.5, size = 1) +
+  geom_stars(data = CHN.DEM.stars, aes(x = x, y = y, fill = CHN_msk_alt), alpha = 0.35) +
+  geom_sf_label(data = CHN.Bound.L1.sf, aes(label = NL_NAME_1), alpha = 0.5, fill = 'white', size = 2.5) + 
+  guides(alpha = FALSE) + 
+  labs(fill = 'Elevation (m)', x = NULL, y = NULL) +
+  theme_bw() + 
+  theme(legend.key.height = unit(x = 5, units = 'cm'))
+
+chn.dem.hs.stars.plot + scale_fill_viridis_c(na.value = 'white')
+```
+
+![](Figures/Middle_Kingdom_sf_stars.png)
+
+```{r}
+chn.dem.hs.stars.plot + scale_fill_distiller(palette = 'Spectral', na.value = 'white')
+```
+
+![](Figures/Middle_Kingdom_sf_stars_rainbow.png)
+

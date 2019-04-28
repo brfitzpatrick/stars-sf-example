@@ -1,0 +1,360 @@
+---
+title: "Geospatial Data Visualisation Example"
+author: "Ben R Fitzpatrick"
+output:
+  html_document:
+    df_print: paged
+---
+
+### Introduction
+
+In this example we will meet two systems for working with geospatial data in R.
+
+The packages `sp` and `raster` are part of the older and more established of these two systems.
+
+The system that includes `sf` and `stars` is a relatively recent addition to R and follows the tidy data principles of the `tidyverse`.
+
+To explore some of the visualisation methods provided by each of these systems we will produce some maps of Switzerland.
+
+### Set Up
+
+Load the packages we will use in this module:
+
+```{r,message = FALSE}
+library(ggrepel)
+library(scico)
+library(sf)
+library(stars)
+library(tidyverse)
+library(ggspatial)
+```
+
+ Note you will also need the following two packages installed:
+
+ `raster`
+
+ `sp`
+
+We won't load these two packages due to a namespace conflict between `raster` and `tidyverse`.
+Instead we will use the `package.name::function.name( )` syntax to call specific functions from packages that are not currently loaded.
+This syntax also serves as a convenient way to highlight when we're using functions from the 'classic' set of packages for working with spatial data in R.
+
+Load the data we will use in this module:
+
+```{r,echo=FALSE}
+load('/home/ben/jan_r_course/geospatial_visualisation/ch_map_data.RData')
+
+ch.dem <- raster::raster(x = '/home/ben/jan_r_course/geospatial_visualisation/ch_dem.tif')
+```
+
+These data were all obtained from open data repositories online.
+
+The code to acquire and prepare these data has been provided as the accompanying file `ch_data_preparation.R`.
+
+Load the file `ch_map_data.RData`
+```{r, eval = FALSE}
+load(file.choose())
+```
+
+Load the file `ch_dem.tif`
+```{r, eval = FALSE}
+ch.dem <- raster::raster(x = file.choose())
+```
+
+### Examining the Data
+
+We have loaded five objects:
+
+```{r}
+ls()
+```
+
+`ch.dem` is an object of class `raster`
+
+```{r}
+class(ch.dem)
+```
+
+`ch.boundaries` is an object of class `sf` (Simple Feature)
+
+```{r}
+class(ch.boundaries)
+```
+
+`ch.lakes` is an object of class Simple Features (`sf`)
+
+```{r}
+class(ch.lakes)
+```
+
+`ch.rivers` is also an object of class Simple Features (`sf`)
+
+```{r}
+class(ch.rivers)
+```
+
+`ch.5.cities.sf` is also an object of class Simple Features (`sf`)
+
+```{r}
+class(ch.5.cities.sf)
+```
+
+We can convert Simple Feature objects back into their 'classic' equivalents with `as_Spatial( )`
+
+```{r, fig.width = 12, fig.height = 9}
+ch.lakes.sp.poly.df <- as_Spatial(ch.lakes)
+
+class(ch.lakes.sp.poly.df)
+
+ch.rivers.sp.lines.df <- as_Spatial(ch.rivers)
+
+class(ch.rivers.sp.lines.df)
+
+ch.boundaries.sp.poly.df <- as_Spatial(ch.boundaries)
+```
+
+### Geospatial Visualisations with `raster` and `sp`
+
+We can plot the `raster` object with the plot method for such objects exported by the package `raster`:
+
+```{r, fig.width = 12, fig.height = 9}
+raster::plot(ch.dem, col = terrain.colors(n = 1e3))
+```
+
+We can overlay the lakes and rivers onto our plot with the plot methods for spatial polygons and spatial lines exported by the package `sp`:
+
+```{r, fig.width = 12, fig.height = 9}
+raster::plot(ch.dem, col = terrain.colors(n = 1e3))
+
+sp::plot(ch.lakes.sp.poly.df, add = TRUE, col = 'darkblue', border = 'darkblue')
+
+sp::plot(ch.rivers.sp.lines.df, add = TRUE, col = 'darkblue')
+```
+
+Next we can then overlay the cantonal boundaries contained in `ch.boundaries.sp.poly.df` with the plot method for spatial polygons exported by the package `sp`:
+
+```{r, fig.width = 12, fig.height = 9}
+raster::plot(ch.dem, col = terrain.colors(n = 1e3))
+
+sp::plot(ch.lakes.sp.poly.df, add = TRUE, col = 'darkblue', border = 'darkblue')
+
+sp::plot(ch.rivers.sp.lines.df, add = TRUE, col = 'darkblue')
+
+sp::plot(ch.boundaries.sp.poly.df, add = TRUE, border = 'black', lwd = 2)
+```
+
+The `raster` package includes functionality to calculate hillshaded terrain surfaces:
+
+```{r, fig.width = 12, fig.height = 9}
+ch.slope <- raster::terrain(x = ch.dem, opt = 'slope')
+
+ch.aspect <- raster::terrain(x = ch.dem, opt = 'aspect')
+
+ch.hs <- raster::hillShade(slope = ch.slope, aspect = ch.aspect, normalize = TRUE)
+```
+
+Plotting the raster of hillshaded terrain:
+
+```{r, fig.width = 12, fig.height = 9}
+raster::plot(ch.hs, col=grey(0:100/100), legend=FALSE)
+```
+
+We can see that hillshading emulates the shadows that would be cast by the terrain features if the sun was shining across the landscape from the northwest (this angle can be changed - have a look at the help page for `raster::hillShade` for more details on this).
+
+Onto this plot of hillshaded terrain we can overlay a semitransparent raster coloured by the land elevation:
+
+```{r, fig.width = 12, fig.height = 9}
+raster::plot(ch.hs, col=grey(0:100/100), legend=FALSE)
+
+raster::plot(ch.dem, col = terrain.colors(n = 1e3, alpha = 0.35), add=TRUE)
+```
+
+and once more overlay the lakes, rivers and cantonal boundaries
+
+```{r, fig.width = 12, fig.height = 9}
+raster::plot(ch.hs, col=grey(0:100/100), legend=FALSE)
+
+raster::plot(ch.dem, col = terrain.colors(n = 1e3, alpha = 0.35), add=TRUE)
+
+sp::plot(ch.lakes.sp.poly.df, add = TRUE, col = 'darkblue', border = 'darkblue')
+
+sp::plot(ch.rivers.sp.lines.df, add = TRUE, col = 'darkblue')
+
+sp::plot(ch.boundaries.sp.poly.df, add = TRUE, border = 'black', lwd = 2)
+```
+
+### Geospatial Visualisations with `stars`, `sf` and `ggplot2`
+
+Now let's replicate this plot with the packages `stars`, `sf` and `ggplot2` and go a little further adding a few new components to the plot.
+I think it quite likely that most if not all of these components could be added to the `raster` and `sp` plots but for this example wanted to focus on the new system provided by `stars`, `sf` and `ggplot2`.
+
+`ggplot2` is part of the `tidyverse` suite of packages and is loaded by `library(tidyverse)`
+
+`stars` & `sf` are new packages for working with spatial data in R that (among many other exciting new features) both follow tidy data principles and integrate with the `tidyverse` ploting package `ggplot2`.
+
+It is worth noting before we proceed that both `stars` and `sf` are currently under active development so some features of these packages may be revised or removed in the future.
+
+Firstly we need to convert the raster of hillshaded terrain from an object of class `raster` to and object of class `stars`:
+
+```{r}
+CH.HS.stars <- st_as_stars(.x = ch.hs)
+```
+
+We need to perform a similar conversion for the raster of elevation data:
+
+```{r}
+CH.DEM.stars <- st_as_stars(.x = ch.dem)
+```
+
+We already have the Spatial Polygons Dataframe containing the Cantonal boundaries as an object of class `sf` (simple features):
+
+```{r}
+class(x = ch.boundaries)
+```
+
+It is worth checking that all objects still have the same coordinate reference system after the conversion (i.e. that the coordinate reference system of one or the other has not been lost of modified in the conversion process)
+
+```{r}
+st_crs(CH.HS.stars) == st_crs(ch.boundaries)
+```
+
+```{r}
+st_crs(CH.HS.stars) == st_crs(CH.DEM.stars)
+```
+
+```{r}
+st_crs(CH.HS.stars) == st_crs(ch.lakes)
+```
+
+```{r}
+st_crs(CH.HS.stars) == st_crs(ch.rivers)
+```
+
+```{r}
+st_crs(CH.HS.stars) == st_crs(ch.5.cities.sf)
+```
+
+```{r}
+st_crs(ch.rivers)
+```
+
+Now we are ready to reproduce our plot from above with the `stars` and `sf` objects using `ggplot2`
+
+```{r, fig.width = 12, fig.height = 9}
+ch.dem.hs.stars.plot <- ggplot() +
+  geom_stars(data = CH.HS.stars, aes(x = x, y = y, alpha = -layer), fill = 'black') +
+  scale_alpha_continuous(na.value = 0) +    
+  coord_equal() +
+  geom_stars(data = CH.DEM.stars, aes(x = x, y = y, fill = ch_dem), alpha = 0.35) +
+  scale_fill_gradientn(colours = terrain.colors(n = 1e3), na.value = 'white') +
+  geom_sf(data = ch.lakes, fill = 'darkblue', colour = 'darkblue') +
+  geom_sf(data = ch.rivers, colour = 'darkblue') + 
+  geom_sf(data = ch.boundaries, fill = NA, colour = 'black', size = 1) +
+  guides(alpha = FALSE) + 
+  labs(fill = 'Elevation (m)', x = NULL, y = NULL) +
+  theme_bw() + 
+  theme(legend.key.height = unit(x = 2, units = 'cm')) +
+  annotation_scale(width_hint = 0.3) + 
+  annotation_north_arrow(location = "br", which_north = "true")
+
+ch.dem.hs.stars.plot
+```
+
+Reproducing the plot above with altitude mapped a colour scale from the `viridis` package:
+
+```{r, fig.width = 12, fig.height = 9}
+ch.dem.hs.stars.plot + scale_fill_viridis_c(na.value = 'white')
+```
+
+Reproducing the plot above with altitude mapped to a rainbow colour scale from the `ggplot2` package:
+
+```{r, fig.width = 12, fig.height = 9}
+ch.dem.hs.stars.plot + scale_fill_distiller(palette = 'Spectral', na.value = 'white')
+```
+
+Labeling the Cantons:
+
+```{r, fig.width = 12, fig.height = 9}
+ch.dem.hs.stars.plot +
+  geom_sf_label(data = ch.boundaries, aes(label = NAME_1), alpha = 0.75, fill = 'white')
+```
+
+A simple way to avoid overlapping labels is to make the labels smaller ;-).
+
+However, this only works up to a point beyond which you can't read the labels anymore...
+
+```{r, fig.width = 12, fig.height = 9}
+ch.dem.hs.stars.plot +
+  geom_sf_label(data = ch.boundaries, aes(label = NAME_1), alpha = 0.75, fill = 'white', size = 2.5)
+```
+
+Now let's overlay some spatial points onto our map.
+Each of these points represents one of the 5 most populous cities in Switzerland.
+We will fill each of these points with a colour proportional to the population of the city it represents.
+
+```{r, fig.width = 12, fig.height = 9}
+ch.dem.hs.stars.plot + 
+  geom_sf(data = ch.5.cities.sf, colour = 'white', size = 7) + 
+  geom_sf(data = ch.5.cities.sf, aes(colour = pop), size = 5) + 
+  scale_colour_scico(palette = 'buda') + 
+  geom_sf_label(data = ch.5.cities.sf, aes(label = name), nudge_y = 10000, alpha = 0.75, fill = 'white') +
+  geom_sf_label(data = ch.5.cities.sf, aes(label = pop.lab), nudge_y = -10000, alpha = 0.75, fill = 'white') +
+  labs(colour = 'Population')
+```
+
+### Extension:
+
+Here I will demonstrate a more labour intensive approach to resolving overlapping labels.
+Below I show how to repel the labels from the coordinates associated with the labels to avoid overlapping labels.
+In particular, I exclude Appenzell Ausserrhoden and Appenzell Innerrhoden from the `sf` object supplied to `geom_sf_label`.
+Instead, I supply the coordinates of the centroids of these two cantons to `geom_text_repel`.
+Note that `geom_text_repel` expects a dataframe (rather than an object of one of the spatial data classes) so I have to perform the appropriate conversion.
+
+```{r, fig.width = 12, fig.height = 9}
+ch.dem.hs.stars.plot +
+  geom_sf_label(data = filter(ch.boundaries, !str_detect(string = NAME_1, 'Appen')),
+                aes(label = NAME_1),
+                alpha = 0.75,
+                fill = 'white',
+                label.padding = unit(0.2, "lines"),
+                size = 3) +
+  geom_text_repel(data = filter(ch.boundaries, str_detect(string = NAME_1, 'Appen')) %>%
+                           st_centroid() %>%
+                             as_Spatial() %>%
+                               as.data.frame() %>%
+                                 mutate(coords.x1.adj = case_when( str_detect(string = NAME_1, 'Inner') ~ coords.x1,
+                                                                  !str_detect(string = NAME_1, 'Inner') ~ coords.x1 - 7500
+                                                        )           
+                                 ),
+                  aes(x = coords.x1.adj, y = coords.x2, label = NAME_1),
+                  force = 0.15,
+                  direction = 'y',
+                  nudge_x = 70000,
+                  segment.size = 0.5,
+                  box.padding = 1,
+                  size = 4) 
+```
+
+Resolving the label overlap between Obwalden and Nidwalden is left as an exercise for the learned reader ;-).
+
+### References:
+
+#### Learn about `sp`, `raster` and more from:
+
+ Bivand, R. S., Pebesma, E., & Gomez-Rubio, V. (2013). Applied spatial data analysis with R (2nd ed.). New York: Springer.
+
+ (Lib4RI provide access to an electronic version of Bivand & Pebesma).
+
+#### Learn about about `sf` & `stars` [here](https://www.r-spatial.org/).
+
+#### Learn more about `ggplot2` [here](https://ggplot2.tidyverse.org/).
+
+#### Twitter (yes, really!)
+
+Follow the latest developments on the Twitter hashtag: #rspatial 
+ 
+Some other relevant hashtags include #rstats #tidyverse #ggplot2 
+ 
+### Further examples from me:
+
+May be found [here](https://github.com/brfitzpatrick/stars-sf-example).
